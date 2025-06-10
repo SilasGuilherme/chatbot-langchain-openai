@@ -1,41 +1,43 @@
 # app.py
-import os
+
 import streamlit as st
-from langchain.chat_models import ChatOpenAI
-from langchain.schema import SystemMessage, HumanMessage
-from dotenv import load_dotenv
+from openai import OpenAI
+from vet_prompt import SYSTEM_PROMPT
 
-# Carrega variáveis de ambiente
-load_dotenv()
-openai_api_key = os.getenv("OPENAI_API_KEY")
+# Configure sua chave da OpenAI no ambiente ou direto aqui (temporário)
+client = OpenAI()
 
-# Instancia modelo
-chat = ChatOpenAI(temperature=0.7, openai_api_key=openai_api_key)
-
-# Interface
-st.set_page_config(page_title="Chatbot com LangChain", layout="centered")
-st.title("🤖 Chatbot com LangChain")
-
-# Prompt inicial do sistema
-system_prompt = SystemMessage(
-    content="Você é um assistente especialista em atendimento ao cliente de uma empresa de tecnologia."
-)
-
-# Histórico de mensagens
+# Inicializa estado da conversa
 if "messages" not in st.session_state:
-    st.session_state.messages = [system_prompt]
+    st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-# Input do usuário
-user_input = st.text_input("Digite sua pergunta:", key="input")
+st.set_page_config(page_title="Veterinário Virtual", page_icon="🐶🐱")
 
-if st.button("Enviar") and user_input:
-    st.session_state.messages.append(HumanMessage(content=user_input))
+st.title("🐶🐱 Veterinário Virtual")
+st.caption("Um assistente informativo para a saúde de cães e gatos. Não substitui uma consulta veterinária!")
 
-    with st.spinner("Processando resposta..."):
-        response = chat(st.session_state.messages)
-        st.session_state.messages.append(response)
-        st.success(response.content)
+with st.chat_message("ai"):
+    st.markdown("Olá! Sou um veterinário virtual. Em que posso ajudar você hoje?")
 
-    # Log
-    with open("logs/conversas.txt", "a") as f:
-        f.write(f"Usuário: {user_input}\nBot: {response.content}\n\n")
+# Exibe o histórico da conversa
+for msg in st.session_state.messages[1:]:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+# Campo de input do usuário
+if prompt := st.chat_input("Digite sua pergunta sobre seu pet..."):
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    with st.chat_message("ai"):
+        with st.spinner("Consultando literatura veterinária..."):
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=st.session_state.messages,
+                temperature=0.7
+            )
+            answer = response.choices[0].message.content
+            st.markdown(answer)
+
+    st.session_state.messages.append({"role": "assistant", "content": answer})
